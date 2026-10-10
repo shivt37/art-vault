@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Image Vault — ninja0099</title>
+<title>Image Vault — shivt37</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' id='gallery'%3E%3Cg%3E%3Cg%3E%3Cpath fill='none' d='M0 0h24v24H0z'%3E%3C/path%3E%3Cpath fill='%23ff8600' d='M1 12C1 4 4 1 12 1s11 3 11 11-3 11-11 11S1 20 1 12'%3E%3C/path%3E%3Cpath fill='%23fff' d='m5.28 16.74 4.68-6.72 3.6 3.72 1.2-1.2 3.96 4.08-13.44.12z'%3E%3C/path%3E%3Ccircle cx='14.76' cy='7.98' r='1.68' fill='%23fff'%3E%3C/circle%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
@@ -790,7 +790,7 @@
 </main>
 
 <script>
-const USER = 'ninja0099';
+const USER = 'shivt37';
 
 // Views of one repo — img1 shows everything except Badges/, Badges shows only it
 const REPOS = [
@@ -802,11 +802,11 @@ const REPOS = [
 let activeRepo = REPOS[0];
 
 function repoBaseUrl(repo) {
-  return `https://${USER}.github.io/img1/`;
+  return `https://${USER}.github.io/art-vault/`;
 }
 
-// Guide always loads from img1
-const GUIDE_BASE = `https://${USER}.github.io/img1/`;
+// Guide always loads from art-vault
+const GUIDE_BASE = `https://${USER}.github.io/art-vault/`;
 const GUIDE_URL  = `${GUIDE_BASE}scripts/guide.md?v=${Date.now()}`;
 
 const IMG_EXT = ['.jpg','.jpeg','.png','.gif','.webp','.webm','.svg','.avif','.mp4'];
@@ -852,7 +852,7 @@ function buildRepoSwitcher() {
       if (window.location.hash === '#guide') {
         history.replaceState(null, '', window.location.pathname);
       }
-      document.title = 'Image Vault — ninja0099';
+      document.title = 'Image Vault — shivt37';
       document.getElementById('folderTree').innerHTML =
         '<div class="tree-label">Loading…</div>';
       buildRepoSwitcher();
