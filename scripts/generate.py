@@ -103,7 +103,8 @@ BLOCKED_KEYWORDS = [
     "uncensored", "creampie", "bukkake",
 ]
 
-# S9c: IDs moved to config ("blocked_ids" per entry); these stay banned always
+# Safety fallback — the real list lives in backdrop-config.json ("blocked_ids"
+# at the top = global for all entries, plus optional per-entry "blocked_ids")
 DEFAULT_BLOCKED_IDS = {
     1241752,
     95897,
@@ -1103,7 +1104,18 @@ def main():
         print(f"❌ Config not found: {CONFIG_PATH}")
         sys.exit(1)
 
-    entries = json.loads(CONFIG_PATH.read_text())
+    config = json.loads(CONFIG_PATH.read_text())
+    if isinstance(config, dict):
+        # New shape: {"blocked_ids": [...], "entries": [...]} — global bans
+        global_blocked = config.get("blocked_ids", [])
+        entries = config.get("entries", [])
+    else:
+        # Old shape: bare [...] list — still accepted, no global bans
+        global_blocked = []
+        entries = config
+    # Merge global bans into every entry (entry-level IDs are added on top)
+    for entry in entries:
+        entry["blocked_ids"] = sorted(set(entry.get("blocked_ids", [])) | set(global_blocked))
     total   = len(entries)
     success = 0
     failed  = []

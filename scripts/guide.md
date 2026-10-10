@@ -100,7 +100,7 @@ You never need to set a colour manually. The script resolves it automatically fo
 | `count` | int | `60` | Max titles after merging all sources |
 | `fanart` | bool | `true` | Use Fanart.tv for higher quality thumbnails |
 | `strict_filter` | bool | `false` | Also drop low-engagement titles (`vote_count < 15` and `popularity < 5`) — useful for mainstream lists, leave off for decades/directors |
-| `blocked_ids` | array | `[]` | Extra TMDB IDs to always block (added to the built-in list) |
+| `blocked_ids` | array | `[]` | Extra TMDB IDs to always block **for this entry only** (added to the global list below) |
 
 > At least one of `"sources"` or `"mdblist_url"` must be present per entry. Both can be set together for a mixed entry.
 
@@ -837,33 +837,60 @@ Only set this if auto-detection gives the wrong colour for a specific entry. Lea
 - TMDB adult flag (`include_adult=false` sent on every API request)
 - Keyword match in title, original title, and overview text: `hentai`, `porn`, `pornography`, `erotica`, `xxx`, `av girl`, `jav`, `milf`, `fetish`, `bondage`, `bdsm`, `ecchi`, `yaoi`, `yuri`, `uncensored`, `creampie`, `bukkake`
 - JAV-style alphanumeric codes (e.g. `ABP-123`, `FC2-456`)
-- Obscure low-engagement content (`vote_count < 15` and `popularity < 5`)
-- TMDB IDs listed in the `BLOCKED_IDS` set in `generate.py`
+- Obscure low-engagement content (`vote_count < 15` and `popularity < 5`) — **only** for entries with `"strict_filter": true`
+- TMDB IDs in the global `"blocked_ids"` list at the top of `backdrop-config.json` (plus any per-entry `"blocked_ids"`)
 
-**How to permanently block a specific title:**
+**How to permanently block a specific title (global — all backdrops):**
 
-1. Find its TMDB ID — the console prints every fetched title during a run
-2. Open `scripts/generate.py`
-3. Find `BLOCKED_IDS` near the top of the file:
+1. Find its TMDB ID — the number in its themoviedb.org page URL, or in the run log
+2. Open `scripts/backdrop-config.json` in your GitHub repo (✏️ pencil icon)
+3. Add the ID to the top-level list:
 
-```python
-BLOCKED_IDS = {
-    1241752,
-    95897,
+```json
+{
+  "blocked_ids": [1241752, 95897, 912345],
+  "entries": [
+    ...
+  ]
 }
 ```
 
-4. Add the new ID:
+4. Commit — blocked in all future runs across all entries. To ban a title from **one** backdrop only, put `"blocked_ids": [912345]` inside that entry instead.
 
-```python
-BLOCKED_IDS = {
-    1241752,
-    95897,
-    912345,   # ← add here
+**Full config shape (your file follows this):**
+
+```json
+{
+  "blocked_ids": [1241752, 95897],
+  "entries": [
+    {
+      "name":          "hbo-max",
+      "label":         "HBO Max",
+      "logo":          "streaming/logo/HBO-max.webp",
+      "output":        "streaming/backdrop/hbo-max.webp",
+      "focus":         "center-right",
+      "count":         50,
+      "fanart":        true,
+      "strict_filter": true,
+      "blocked_ids":   [912345],
+      "sources": [
+        "movie:sort_by=popularity.desc&watch_region=US&with_watch_providers=1899",
+        "tv:sort_by=popularity.desc&watch_region=US&with_watch_providers=1899"
+      ]
+    },
+    {
+      "name":        "action",
+      "label":       "Action",
+      "output":      "Genre/backdrop/Action.webp",
+      "focus":       "center-right",
+      "count":       50,
+      "fanart":      true,
+      "mdblist_url": ["snoak/action-movies", "snoak/action-shows"],
+      "sort":        ""
+    }
+  ]
 }
 ```
-
-5. Commit — blocked in all future runs across all entries
 
 ---
 

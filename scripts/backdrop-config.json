@@ -1,4 +1,6 @@
-[
+{
+  "blocked_ids": [1241752, 95897],
+  "entries": [
   {
     "name":   "netflix",
     "label":  "Netflix",
@@ -514,4 +516,5 @@
     "mdblist_url": ["snoak/top-2020s-movies", "ryankeast/tv-shows-decades-2020s-fexjkmd07m"],
     "sort":        ""
   }
-]
+  ]
+}
