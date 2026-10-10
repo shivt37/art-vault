@@ -934,13 +934,15 @@ For each entry in `backdrop-config.json`:
 - Deduplicate by `(media_type, tmdb_id)`
 - Trim to `count` limit
 
-**STEP 6** — Download thumbnails
+**STEP 6** — Download thumbnails (8 parallel workers, order preserved)
+- Shared connection pool; 429 responses honor `Retry-After` (max 60s), 5xx retried with backoff
 - For each title, in order:
   - `fanart: true` AND `FANART_API_KEY` set:
     - TV → get `tvdb_id` → Fanart `/tv/{tvdb_id}` → best `tvthumb`
     - Movie → Fanart `/movies/{tmdb_id}` → best `moviethumb`
     - Fanart priority: preferred language (English) → original title language → textless / no-language artwork → any other non-empty language
-  - TMDB fallback → `backdrop_path` at `w1280`
+    - Each artwork URL is used once across the whole entry (first title wins)
+  - TMDB fallback → `backdrop_path` at `w780` (tiles display at 372×210 — full `w1280` was overkill)
   - Skip title if nothing found after all fallbacks
 - Minimum 12 tiles enforced — repeats if fewer downloaded
 

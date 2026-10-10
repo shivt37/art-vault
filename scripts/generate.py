@@ -31,9 +31,11 @@ import os
 import re
 import shutil
 import sys
+import threading
 import time
 import random   
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import parse_qsl
 
@@ -55,7 +57,13 @@ MDBLIST_KEY  = os.environ.get("MDBLIST_API_KEY", "")
 TMDB_BASE    = "https://api.themoviedb.org/3"
 TMDB_IMG     = "https://image.tmdb.org/t/p"
 FANART_BASE  = "https://webservice.fanart.tv/v3"
-BACKDROP_SZ  = "w1280"
+# S12: tiles display at 372x210 — w1280 downloads were ~3x overkill
+TILE_IMG_SZ  = "w780"
+
+# S12: shared connection pool + bounded parallelism (polite: 8 workers)
+SESSION = requests.Session()
+SESSION.headers.update({"User-Agent": "img1-backdrop-generator/1.0"})
+MAX_WORKERS = 8
 
 # ─────────────────────────────────────────────────────────────────────────────
 # T2 GRID CONSTANTS & CAMERA SETTINGS
@@ -245,25 +253,40 @@ def resolve_accent(entry):
 # TMDB HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _http_get(url, params=None, timeout=20, retries=3):
+    """GET via the shared session. Retries 429 (honors Retry-After, max 60s)
+    and 5xx/network errors with backoff. Thread-safe."""
+    for attempt in range(retries + 1):
+        try:
+            r = SESSION.get(url, params=params, timeout=timeout)
+            if r.status_code == 429 and attempt < retries:
+                try:
+                    delay = min(60.0, float(r.headers.get("Retry-After", "")))
+                except (TypeError, ValueError):
+                    delay = 2.0 * (attempt + 1)
+                time.sleep(delay)
+                continue
+            r.raise_for_status()
+            return r
+        except requests.HTTPError as exc:
+            code = exc.response.status_code if exc.response is not None else None
+            if code is not None and code >= 500 and attempt < retries:
+                time.sleep(1 + attempt)
+                continue
+            raise
+        except requests.RequestException:
+            if attempt < retries:
+                time.sleep(1 + attempt)
+                continue
+            raise
+    raise RuntimeError("unreachable")
+
+
 def _tmdb_get(endpoint, params=None):
     p = dict(params or {})
     p["api_key"] = TMDB_KEY
     p.setdefault("include_adult", False)
-    for attempt in range(3):
-        try:
-            r = requests.get(f"{TMDB_BASE}{endpoint}", params=p, timeout=20)
-            r.raise_for_status()
-            return r.json()
-        except requests.HTTPError as exc:
-            code = exc.response.status_code if exc.response is not None else None
-            if code is None or code < 500 or attempt == 2:
-                raise
-            time.sleep(1 + attempt)
-        except requests.RequestException:
-            if attempt == 2:
-                raise
-            time.sleep(1 + attempt)
-    return {}
+    return _http_get(f"{TMDB_BASE}{endpoint}", params=p).json()
 
 
 def _parse_request_spec(spec):
@@ -378,8 +401,7 @@ def fetch_mdblist_titles(mdblist_url, sort, count, strict_filter=False, blocked_
 
     print(f"  📋 MDBList: fetching {username}/{slug}")
     try:
-        r = requests.get(f"https://api.mdblist.com/lists/user/{username}", params=key, timeout=20)
-        r.raise_for_status()
+        r = _http_get(f"https://api.mdblist.com/lists/user/{username}", params=key, timeout=20)
         user_lists = r.json()
     except Exception as exc:
         print(f"  ❌ MDBList user lists failed: {exc}")
@@ -403,8 +425,7 @@ def fetch_mdblist_titles(mdblist_url, sort, count, strict_filter=False, blocked_
     params["limit"] = count * 2
 
     try:
-        r = requests.get(f"https://api.mdblist.com/lists/{list_id}/items", params=params, timeout=20)
-        r.raise_for_status()
+        r = _http_get(f"https://api.mdblist.com/lists/{list_id}/items", params=params, timeout=20)
         data = r.json()
     except Exception as exc:
         print(f"  ❌ MDBList items fetch failed: {exc}")
@@ -447,8 +468,7 @@ def fetch_mdblist_titles(mdblist_url, sort, count, strict_filter=False, blocked_
 def _download_url(url, retries=2):
     for attempt in range(retries + 1):
         try:
-            r = requests.get(url, timeout=20)
-            r.raise_for_status()
+            r = _http_get(url, retries=0)
             return Image.open(io.BytesIO(r.content)).convert("RGBA")
         except Exception as exc:
             if attempt == retries:
@@ -508,9 +528,8 @@ def _pick_fanart_urls_multi(fanart_data, kind, preferred_lang, original_lang, ma
 
 def _fanart_tv(tvdb_id):
     try:
-        r = requests.get(f"{FANART_BASE}/tv/{tvdb_id}",
-                         params={"api_key": FANART_KEY}, timeout=15)
-        r.raise_for_status()
+        r = _http_get(f"{FANART_BASE}/tv/{tvdb_id}",
+                      params={"api_key": FANART_KEY}, timeout=15)
         return r.json()
     except Exception:
         return None
@@ -518,9 +537,8 @@ def _fanart_tv(tvdb_id):
 
 def _fanart_movie(tmdb_id):
     try:
-        r = requests.get(f"{FANART_BASE}/movies/{tmdb_id}",
-                         params={"api_key": FANART_KEY}, timeout=15)
-        r.raise_for_status()
+        r = _http_get(f"{FANART_BASE}/movies/{tmdb_id}",
+                      params={"api_key": FANART_KEY}, timeout=15)
         return r.json()
     except Exception:
         return None
@@ -817,23 +835,22 @@ def generate_entry(entry, index, total):
 
     print(f"  📦 Merged: {len(merged)} unique titles")
 
-    # ── Download images ───────────────────────────────────────────────────────
+    # ── Download images (S12: bounded worker pool, order preserved) ─────────
     print(f"  🖼️  Downloading images…")
-    tiles = []
-    fanart_hits = tmdb_hits = skip = 0
     fanart_cache = {}   # (kind, tmdb_id) → list of all fanart URLs
     used_urls    = set()
+    lock = threading.Lock()
 
-    for i, (kind, item) in enumerate(merged, 1):
-        title = item.get("title") or item.get("name", "?")
-        sys.stdout.write(f"  [{i:02d}/{len(merged)}] {title[:50]:<50}\r")
-        sys.stdout.flush()
-
+    def fetch_one(pair):
+        """Download the tile for one title. Returns (img, source)."""
+        kind, item = pair
         tmdb_id   = item["id"]
         orig_lang = item.get("original_language")
         cache_key = (kind, tmdb_id)
 
-        if fanart and FANART_KEY and cache_key not in fanart_cache:
+        with lock:
+            need_fanart = fanart and FANART_KEY and cache_key not in fanart_cache
+        if need_fanart:
             if kind == "tv":
                 ext = {}
                 try:
@@ -844,28 +861,47 @@ def generate_entry(entry, index, total):
                 fd = _fanart_tv(tvdb_id) if tvdb_id else None
             else:
                 fd = _fanart_movie(tmdb_id)
-            fanart_cache[cache_key] = _pick_fanart_urls_multi(
-                fd, kind, "en", orig_lang, max_urls=10)
+            with lock:
+                fanart_cache[cache_key] = _pick_fanart_urls_multi(
+                    fd, kind, "en", orig_lang, max_urls=10)
 
-        img = None
-        for url in fanart_cache.get(cache_key, []):
-            if url not in used_urls:
-                img = _download_url(url)
-                if img:
-                    used_urls.add(url)
-                    fanart_hits += 1
-                    break
+        with lock:
+            urls = list(fanart_cache.get(cache_key, []))
 
-        if img is None and item.get("backdrop_path"):
-            img = _download_url(f"{TMDB_IMG}/{BACKDROP_SZ}{item['backdrop_path']}")
+        for url in urls:
+            with lock:
+                if url in used_urls:
+                    continue
+                used_urls.add(url)  # reserve: each artwork used once
+            img = _download_url(url)
             if img:
-                tmdb_hits += 1
+                return img, "fanart"
+            with lock:
+                used_urls.discard(url)  # release on failure
 
-        if img:
-            tiles.append(img)
-        else:
-            skip += 1
-        
+        if item.get("backdrop_path"):
+            img = _download_url(f"{TMDB_IMG}/{TILE_IMG_SZ}{item['backdrop_path']}")
+            if img:
+                return img, "tmdb"
+
+        return None, "missing"
+
+    tiles = []
+    fanart_hits = tmdb_hits = skip = 0
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+        for i, (img, source) in enumerate(pool.map(fetch_one, merged), 1):
+            title = merged[i - 1][1].get("title") or merged[i - 1][1].get("name", "?")
+            sys.stdout.write(f"  [{i:02d}/{len(merged)}] {title[:50]:<50}\r")
+            sys.stdout.flush()
+            if img is None:
+                skip += 1
+            elif source == "fanart":
+                fanart_hits += 1
+                tiles.append(img)
+            else:
+                tmdb_hits += 1
+                tiles.append(img)
+
     sys.stdout.write("\n")
 
     if FANART_KEY and fanart:
