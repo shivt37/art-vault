@@ -650,7 +650,7 @@
     }
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 768px) {
     #sidebar {
       position: fixed;
       left: -260px;
@@ -708,7 +708,7 @@
     #guide-panel table { font-size: 11px; }
     #guide-panel th, #guide-panel td { padding: 5px 8px; }
   }
-  @media (min-width: 641px) {
+  @media (min-width: 769px) {
     #menuBtn { display: none; }
     #overlay  { display: none !important; }
   }
@@ -846,6 +846,12 @@ function buildRepoSwitcher() {
       document.getElementById('image-grid').style.display = 'none';
       document.getElementById('json-grid').style.display = 'none';
       document.getElementById('guide-panel').style.display = 'none';
+      document.getElementById('guideBtn').classList.remove('active');
+      lastFolder = null;
+      if (window.location.hash === '#guide') {
+        history.replaceState(null, '', window.location.pathname);
+      }
+      document.title = 'Image Vault — ninja0099';
       document.getElementById('folderTree').innerHTML =
         '<div class="tree-label">Loading…</div>';
       buildRepoSwitcher();
@@ -902,6 +908,7 @@ let allImages = [];
 let folderMap = {};
 let allFolderKeys = [];
 let activeFolder = null;
+let lastFolder = null;
 let searchQuery = '';
 
 // ── INIT ──────────────────────────────────────────────────────────────────
@@ -980,8 +987,8 @@ window.addEventListener('hashchange', () => {
   } else {
     document.getElementById('guideBtn').classList.remove('active');
     document.getElementById('guide-panel').style.display = 'none';
-    const firstFolder = allFolderKeys[0];
-    if (firstFolder) selectFolder(firstFolder);
+    const backFolder = (lastFolder && allFolderKeys.includes(lastFolder)) ? lastFolder : allFolderKeys[0];
+    if (backFolder) selectFolder(backFolder);
   }
 });
 
@@ -1033,6 +1040,8 @@ function buildSidebar() {
 
 function selectFolder(folder) {
   activeFolder = folder;
+  lastFolder = folder;
+  document.title = folder.split('/').pop() + ' — Image Vault';
   searchQuery = '';
   document.getElementById('searchInput').value = '';
 
@@ -1155,7 +1164,7 @@ function renderView() {
         .forEach(item => jsonGrid.appendChild(makeJsonCard(item)));
     }
     if (imgResults.length > 0) {
-      imgGrid.style.display = window.innerWidth <= 640 ? 'grid' : 'block';
+      imgGrid.style.display = window.innerWidth <= 768 ? 'grid' : 'block';
       imgResults
         .slice().sort((a,b) => a.name.localeCompare(b.name, undefined, { numeric:true, sensitivity:'base' }))
         .forEach(img => imgGrid.appendChild(makeImageCard(img)));
@@ -1189,7 +1198,7 @@ function renderView() {
       directJson.forEach(item => jsonGrid.appendChild(makeJsonCard(item)));
     }
     if (directImgs.length > 0) {
-      imgGrid.style.display = window.innerWidth <= 640 ? 'grid' : 'block';
+      imgGrid.style.display = window.innerWidth <= 768 ? 'grid' : 'block';
       directImgs.forEach(img => imgGrid.appendChild(makeImageCard(img)));
     }
 
@@ -1288,7 +1297,7 @@ function renderView() {
     } else {
       // Render image cards
       imgGrid.innerHTML = '';
-      imgGrid.style.display = window.innerWidth <= 640 ? 'grid' : 'block';
+      imgGrid.style.display = window.innerWidth <= 768 ? 'grid' : 'block';
       items.forEach(img => imgGrid.appendChild(makeImageCard(img)));
     }
   }
