@@ -42,9 +42,10 @@ jobs:
       - name: Generate manifest.json
         if: success()
         run: |
-          find . -type f \( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.gif" -o -name "*.webp" -o -name "*.webm" -o -name "*.svg" -o -name "*.avif" -o -name "*.mp4" \) \
+          find . -type f \( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.gif" -o -name "*.webp" -o -name "*.webm" -o -name "*.svg" -o -name "*.avif" -o -name "*.mp4" -o -name "*.json" \) \
             -not -path "./.git/*" \
             -not -path "./scripts/*" \
+            -not -path "./manifest.json" \
             | sed 's|^\./||' \
             | sort \
             | python3 -c "import sys,json; files=[l.strip() for l in sys.stdin if l.strip()]; print(json.dumps(files,indent=2))" \

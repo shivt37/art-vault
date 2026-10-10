@@ -797,11 +797,17 @@ const REPOS = [
   { id: 'Badges', label: 'Badges' },
 ];
 
-// Active repo — defaults to img1
+// Views of one repo — img1 shows everything except Badges/, Badges shows only it
+const REPOS = [
+  { id: 'img1',   label: 'img1'   },
+  { id: 'Badges', label: 'Badges' },
+];
+
+// Active view — defaults to img1
 let activeRepo = REPOS[0];
 
 function repoBaseUrl(repo) {
-  return `https://${USER}.github.io/${repo.id}/`;
+  return `https://${USER}.github.io/img1/`;
 }
 
 // Guide always loads from img1
@@ -878,11 +884,33 @@ function detectTypeFromFolder(folderPath) {
 }
 
 // ── IS JSON FOLDER? ──
-// Returns true only for the top-level "json" folder (or subfolders inside it)
-// in the Badges repo
+// Only Badges/json (badge JSON cards live there)
 function isJsonFolder(folderPath) {
-  return activeRepo.id === 'Badges' &&
-    (folderPath === 'json' || folderPath.startsWith('json/'));
+  return folderPath === 'Badges/json' || folderPath.startsWith('Badges/json/');
+}
+
+// ── VIEW HELPERS (img1 vs Badges are folder-scoped views of one manifest) ──
+function isBadgePath(folder) {
+  return folder === 'Badges' || folder.startsWith('Badges/');
+}
+function inActiveView(folder) {
+  const badge = isBadgePath(folder);
+  return activeRepo.id === 'Badges' ? (badge && folder !== 'Badges') : !badge;
+}
+function viewFolderKeys() {
+  return allFolderKeys.filter(inActiveView);
+}
+function viewImages() {
+  return allImages.filter(i => inActiveView(i.folder));
+}
+// Strip the Badges/ prefix for display in the Badges view
+function displayFolder(folder) {
+  if (activeRepo.id === 'Badges') return folder.replace(/^Badges\//, '');
+  return folder;
+}
+function viewDepth(folder) {
+  const d = folder.split('/').length - 1;
+  return activeRepo.id === 'Badges' ? Math.max(0, d - 1) : d;
 }
 
 function isParentFolder(folder, allFolderKeys) {
@@ -929,9 +957,9 @@ async function init() {
     allImages = files
       .filter(f => {
         const ext = f.slice(f.lastIndexOf('.')).toLowerCase();
-        // For Badges repo: allow .json only inside the json/ folder
+        // Badge JSON cards live only in Badges/json/
         if (ext === '.json') {
-          return activeRepo.id === 'Badges' && f.startsWith('json/');
+          return activeRepo.id === 'Badges' && f.startsWith('Badges/json/');
         }
         return IMG_EXT.includes(ext);
       })
@@ -965,14 +993,14 @@ async function init() {
     allFolderKeys = Array.from(allFolderSet).sort();
 
     buildSidebar();
-    renderStats(allImages);
+    renderStats(viewImages());
     buildRepoSwitcher();
 
     // ── HASH ROUTING — only for guide ──
     if (window.location.hash === '#guide') {
       showGuide();
     } else {
-      const firstFolder = allFolderKeys[0];
+      const firstFolder = viewFolderKeys()[0];
       if (firstFolder) selectFolder(firstFolder);
     }
 
@@ -992,7 +1020,8 @@ window.addEventListener('hashchange', () => {
   } else {
     document.getElementById('guideBtn').classList.remove('active');
     document.getElementById('guide-panel').style.display = 'none';
-    const backFolder = (lastFolder && allFolderKeys.includes(lastFolder)) ? lastFolder : allFolderKeys[0];
+    const viewKeys = viewFolderKeys();
+    const backFolder = (lastFolder && viewKeys.includes(lastFolder)) ? lastFolder : viewKeys[0];
     if (backFolder) selectFolder(backFolder);
   }
 });
@@ -1007,10 +1036,11 @@ function buildSidebar() {
   label.textContent = 'Folders';
   tree.appendChild(label);
 
-  allFolderKeys.forEach(folder => {
-    const depth = folder.split('/').length - 1;
-    const displayName = folder.split('/').pop();
-    const isParent = isParentFolder(folder, allFolderKeys);
+  const viewKeys = viewFolderKeys();
+  viewKeys.forEach(folder => {
+    const depth = viewDepth(folder);
+    const displayName = displayFolder(folder).split('/').pop();
+    const isParent = isParentFolder(folder, viewKeys);
     const count = allImages.filter(img =>
       img.folder === folder || img.folder.startsWith(folder + '/')
     ).length;
@@ -1143,7 +1173,7 @@ function renderView() {
   if (searchQuery) {
     const normalise = s => s.toLowerCase().replace(/[-_]/g, ' ');
     const q = normalise(searchQuery);
-    const results = allImages.filter(i => {
+    const results = viewImages().filter(i => {
       const name   = normalise(i.name.replace(/\.[^.]+$/, ''));
       const folder = normalise(i.folder);
       return name.includes(q) || folder.includes(q);
@@ -1180,7 +1210,7 @@ function renderView() {
   if (!activeFolder) return;
 
   const folderName = activeFolder.split('/').pop();
-  const isParent   = isParentFolder(activeFolder, allFolderKeys);
+  const isParent   = isParentFolder(activeFolder, viewFolderKeys());
   const totalCount = allImages.filter(img =>
     img.folder === activeFolder || img.folder.startsWith(activeFolder + '/')
   ).length;
@@ -1208,7 +1238,7 @@ function renderView() {
     }
 
     const activeParts = activeFolder.split('/');
-    const children = allFolderKeys.filter(f => {
+    const children = viewFolderKeys().filter(f => {
       const parts = f.split('/');
       return (
         parts.length === activeParts.length + 1 &&
@@ -1219,7 +1249,7 @@ function renderView() {
     subGrid.style.display = 'grid';
     children.forEach((child) => {
       const childName     = child.split('/').pop();
-      const childIsParent = isParentFolder(child, allFolderKeys);
+      const childIsParent = isParentFolder(child, viewFolderKeys());
       const childCount    = allImages.filter(img =>
         img.folder === child || img.folder.startsWith(child + '/')
       ).length;
