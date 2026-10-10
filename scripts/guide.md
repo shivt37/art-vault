@@ -99,6 +99,8 @@ You never need to set a colour manually. The script resolves it automatically fo
 | `focus` | string | `"center-right"` | Focal point preset or `"x,y"` custom values (see [Focus Options](#focus-options)) |
 | `count` | int | `60` | Max titles after merging all sources |
 | `fanart` | bool | `true` | Use Fanart.tv for higher quality thumbnails |
+| `strict_filter` | bool | `false` | Also drop low-engagement titles (`vote_count < 15` and `popularity < 5`) — useful for mainstream lists, leave off for decades/directors |
+| `blocked_ids` | array | `[]` | Extra TMDB IDs to always block (added to the built-in list) |
 
 > At least one of `"sources"` or `"mdblist_url"` must be present per entry. Both can be set together for a mixed entry.
 

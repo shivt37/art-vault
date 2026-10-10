@@ -103,8 +103,8 @@ BLOCKED_KEYWORDS = [
     "uncensored", "creampie", "bukkake",
 ]
 
-# Add TMDB IDs here to permanently hard-block specific titles
-BLOCKED_IDS = {
+# S9c: IDs moved to config ("blocked_ids" per entry); these stay banned always
+DEFAULT_BLOCKED_IDS = {
     1241752,
     95897,
 }
@@ -117,14 +117,15 @@ def _normalize_text(text):
     return text.strip()
 
 
-def _is_adult(item):
+def _is_adult(item, strict_filter=False, blocked_ids=None):
     """Return True if the item should be filtered out."""
-    if item.get("id") in BLOCKED_IDS:
+    banned = DEFAULT_BLOCKED_IDS if blocked_ids is None else (DEFAULT_BLOCKED_IDS | set(blocked_ids))
+    if item.get("id") in banned:
         return True
     if item.get("adult") is True:
         return True
-    # Low-quality heuristic: obscure content with near-zero engagement
-    if item.get("vote_count", 0) < 15 and item.get("popularity", 0) < 5:
+    # S9c: obscurity heuristic runs only for entries that opt in via "strict_filter"
+    if strict_filter and item.get("vote_count", 0) < 15 and item.get("popularity", 0) < 5:
         return True
 
     texts = [
@@ -137,13 +138,12 @@ def _is_adult(item):
     combined = " ".join(texts).lower()
 
     for word in BLOCKED_KEYWORDS:
-        if word in combined:
-            return True
+        # S9a: whole-word match only — substring check dropped (blocked innocents)
         if re.search(r"\b" + re.escape(word) + r"\b", combined):
             return True
 
-    # JAV-style codes
-    for pattern in [r"\b[a-z]{2,5}-\d{2,5}\b", r"\bfc2\b", r"\b\d{6,}\b"]:
+    # JAV-style codes (S9b: bare \d{6,} dropped — flagged box-office/vote numbers)
+    for pattern in [r"\b[a-z]{2,5}-\d{2,5}\b", r"\bfc2\b"]:
         if re.search(pattern, combined):
             return True
 
@@ -307,7 +307,7 @@ def _parse_request_spec(spec):
     return {"mode": "discover", "media_type": media_type, "params": params}
 
 
-def _fetch_for_spec(spec, max_pages=3):
+def _fetch_for_spec(spec, max_pages=3, strict_filter=False, blocked_ids=None):
     """Fetch up to max_pages of results for one parsed spec."""
     items = []
     if spec["mode"] == "discover":
@@ -323,20 +323,20 @@ def _fetch_for_spec(spec, max_pages=3):
         if not page_results:
             break
         for item in page_results:
-            if not _is_adult(item) and item.get("backdrop_path"):
+            if not _is_adult(item, strict_filter, blocked_ids) and item.get("backdrop_path"):
                 items.append((spec["media_type"], item))
         if page >= (data.get("total_pages") or max_pages):
             break
     return items
 
 
-def fetch_tmdb_titles(sources, count):
+def fetch_tmdb_titles(sources, count, strict_filter=False, blocked_ids=None):
     """
     Fetch and interleave results from all TMDB source specs.
     Returns list of (media_type, tmdb_item) tuples, deduplicated, up to count.
     """
     specs = [_parse_request_spec(s) for s in sources]
-    per_spec = [_fetch_for_spec(spec) for spec in specs]
+    per_spec = [_fetch_for_spec(spec, strict_filter=strict_filter, blocked_ids=blocked_ids) for spec in specs]
 
     # Round-robin interleave so no single source dominates
     merged = []
@@ -373,7 +373,7 @@ def _parse_mdblist_url(url):
     raise ValueError(f"Cannot parse MDBList URL: {url!r}. Use 'username/slug'")
 
 
-def fetch_mdblist_titles(mdblist_url, sort, count):
+def fetch_mdblist_titles(mdblist_url, sort, count, strict_filter=False, blocked_ids=None):
     """
     Fetch titles from a MDBList.
     Step 1: GET /lists/user/{username} → find list_id by slug
@@ -440,7 +440,7 @@ def fetch_mdblist_titles(mdblist_url, sort, count):
             tmdb_item = hits[0]
         except Exception:
             continue
-        if _is_adult(tmdb_item):
+        if _is_adult(tmdb_item, strict_filter, blocked_ids):
             continue
         if not (tmdb_item.get("backdrop_path") or tmdb_item.get("poster_path")):
             continue
@@ -885,6 +885,9 @@ def generate_entry(entry, index, total):
     sort   = entry.get("sort", "score.desc")
     sources     = entry.get("sources", [])
     mdblist_url = entry.get("mdblist_url", "")
+    # S9c: obscurity filter is opt-in; extra banned TMDB IDs come from config
+    strict_filter = bool(entry.get("strict_filter", False))
+    blocked_ids   = entry.get("blocked_ids", [])
 
     print(f"\n{'='*60}")
     print(f"[{index}/{total}] {label}")
@@ -922,7 +925,7 @@ def generate_entry(entry, index, total):
     if sources:
         print(f"  🔍 Fetching TMDB ({len(sources)} source(s))…")
         try:
-            tmdb_titles = fetch_tmdb_titles(sources, count)
+            tmdb_titles = fetch_tmdb_titles(sources, count, strict_filter, blocked_ids)
             print(f"  ✅ TMDB: {len(tmdb_titles)} titles")
         except Exception as exc:
             print(f"  ❌ TMDB fetch failed: {exc}")
@@ -935,7 +938,7 @@ def generate_entry(entry, index, total):
         per_count = max(1, math.ceil(count / len(mdb_urls)))  # e.g. ceil(60/2)=30, ceil(50/3)=17
         for mdb_url in mdb_urls:
             try:
-                results = fetch_mdblist_titles(mdb_url, sort, per_count)  # ← per_count
+                results = fetch_mdblist_titles(mdb_url, sort, per_count, strict_filter, blocked_ids)  # ← per_count
                 per_list.append(results)
             except Exception as exc:
                 print(f"  ❌ MDBList fetch failed ({mdb_url}): {exc}")
