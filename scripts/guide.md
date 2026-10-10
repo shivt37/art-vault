@@ -973,8 +973,10 @@ For each entry in `backdrop-config.json`:
 - Layer 4: top-right accent glow — 40% spread, 55 intensity, Gaussian-blurred
 
 **STEP 9** — Save as WebP
-- 1920×1080, quality 82, method 6
+- 1920×1080, quality 90, method 6 (max) — fixed by design, see below
 - Written directly as WebP to the output path — no `.jpg` at any point
+
+> **Output is fixed by design:** every backdrop is 1920×1080 WebP at quality 90, compression effort 6 (the maximum — slowest to encode, smallest file for that quality). Quality 90 over the old 82 keeps text and flat dark areas cleaner at the cost of somewhat larger files (watch the KB printed per file). There are intentionally no per-entry size/quality options — the gallery is uniform 1080p, and quality above 90 buys nothing visible on backdrops while fattening every monthly commit.
 
 **STEP 10** — Report
 - Success → prints output path and file size in KB

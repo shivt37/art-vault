@@ -1080,7 +1080,7 @@ def generate_entry(entry, index, total):
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     final = canvas.convert("RGB")
-    final.save(str(out_path), "WEBP", quality=82, method=6)
+    final.save(str(out_path), "WEBP", quality=90, method=6)
 
     size_kb = out_path.stat().st_size // 1024
     print(f"  ✅ Saved: {output} ({size_kb} KB)")
