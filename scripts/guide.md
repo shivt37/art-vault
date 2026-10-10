@@ -36,8 +36,6 @@ Every **1st of the month**, GitHub Actions runs `generate.py`, which:
 ```
 scripts/
   generate.py           ← the only script that runs — handles everything
-  accent.py             ← kept for reference, not called at runtime
-  backdrop.py           ← kept for reference, not called at runtime
   backdrop-config.json  ← YOUR config — the only file you ever edit
   requirements.txt      ← pinned pip deps used by the workflow
 
@@ -293,19 +291,7 @@ The focal point controls two things: which area of the grid gets the sharpest, b
 
 ### Depth of Field (DoF) Blur Engine
 
-```python
-DOF_BLUR_MAX = 0.0   # Maximum blur radius in pixels (0 = disabled)
-DOF_FALLOFF  = 1.5   # Exponential rate of blur increase from the focal point
-```
-
-The DoF system calculates the distance of every pixel from the focal point and applies a proportional Gaussian blur — tiles far from the focal point appear slightly out of focus, like a DSLR lens effect. It is **disabled by default** (`DOF_BLUR_MAX = 0.0`) because it significantly increases render time and the effect is subtle at 1080p.
-
-| Constant | Value | What it does | Customise |
-|---|---|---|---|
-| `DOF_BLUR_MAX` | `0.0` | Maximum blur radius in pixels applied to tiles at the furthest distance from the focal point. Set to `0` to skip the DoF pass entirely. | `0.0` — disabled (default, fastest). `4.0` — subtle cinematic softness. `8.0` — strong blur on far-edge tiles, noticeable at 1080p. `12.0` — heavy effect, slow to render. |
-| `DOF_FALLOFF` | `1.5` | Controls how quickly blur increases as distance from the focal point grows. Higher values keep the in-focus zone sharp for longer then blur aggressively at the edges. | `1.0` — linear increase, even blur across the canvas. `2.0` — sharp centre, fast falloff. `3.0` — very tight focus zone, almost everything else blurred. |
-
-> **Performance note:** enabling DoF (`DOF_BLUR_MAX > 0`) runs 6 Gaussian blur passes across a 1920×1080 NumPy array and blends them per-pixel. On GitHub Actions this adds roughly 15–30 seconds per entry. With 44 entries, that is 10–20 extra minutes per run. Only enable if the visual result is worth it for your use case.
+> Removed in cleanup — the engine was permanently disabled (`DOF_BLUR_MAX = 0.0`) and only printed a misleading log line, so the code, constants and call were deleted. No blur step runs; tiles are composited sharp.
 
 ---
 

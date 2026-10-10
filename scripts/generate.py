@@ -73,16 +73,10 @@ TILT_DEG    = 10      # T2 uses a counter-clockwise tilt
 STAGGER     = 0.35     # T2 brick wall offset
 FADE_LEFT   = 0.30     # Left side opacity (dim)
 FADE_RIGHT  = 1.00     # Right side opacity (bright)
-OFFSET_X    = 335      # Shift camera right
-OFFSET_Y    = 100      # Shift camera down
 
 # T2 Focal Point
 FOCUS_X     = 0.5
 FOCUS_Y     = 0.0
-
-# T2 Depth of Field Settings
-DOF_BLUR_MAX = 0.0     
-DOF_FALLOFF  = 1.5     
 
 FOCUS_PRESETS = {
     "center":       (0.50, 0.50),
@@ -109,13 +103,6 @@ DEFAULT_BLOCKED_IDS = {
     1241752,
     95897,
 }
-
-
-def _normalize_text(text):
-    text = text.lower()
-    text = re.sub(r"[_\-.]", " ", text)
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
 
 
 def _is_adult(item, strict_filter=False, blocked_ids=None):
@@ -477,51 +464,6 @@ def _normalize_lang(v):
     return None if v in {"", "00", "none", "null"} else v
 
 
-def _pick_fanart_url(fanart_data, kind, preferred_lang, original_lang):
-    """
-    4-tier Fanart selection (from backdrop.py):
-      1. preferred language
-      2. original title language
-      3. textless (no language)
-      4. any other non-empty language
-    """
-    if not fanart_data:
-        return None, None
-
-    pref = _normalize_lang(preferred_lang)
-    orig = _normalize_lang(original_lang)
-
-    if kind == "tv":
-        groups = [("thumb", fanart_data.get("tvthumb") or []),
-                  ("bg",    fanart_data.get("showbackground") or [])]
-    else:
-        groups = [("thumb", fanart_data.get("moviethumb") or []),
-                  ("bg",    fanart_data.get("moviebackground") or [])]
-
-    buckets = {"preferred": [], "original": [], "textless": [], "other": []}
-
-    for group_rank, (_, candidates) in enumerate(groups):
-        for candidate in candidates:
-            lang = _normalize_lang(candidate.get("lang"))
-            entry = {"c": candidate, "gr": group_rank}
-            if pref and lang == pref:
-                buckets["preferred"].append(entry)
-            elif orig and lang == orig:
-                buckets["original"].append(entry)
-            elif lang is None:
-                buckets["textless"].append(entry)
-            elif lang:
-                buckets["other"].append(entry)
-
-    for bucket in ("preferred", "original", "textless", "other"):
-        if buckets[bucket]:
-            best = sorted(buckets[bucket],
-                          key=lambda e: (e["gr"], -int(e["c"].get("likes", 0))))[0]["c"]
-            if best.get("url"):
-                return best["url"], bucket
-
-    return None, None
-
 def _pick_fanart_urls_multi(fanart_data, kind, preferred_lang, original_lang, max_urls=10):
     """Return up to max_urls ranked fanart URLs for a single title."""
     if not fanart_data:
@@ -584,68 +526,6 @@ def _fanart_movie(tmdb_id):
         return None
 
 
-def fetch_tile_image(kind, item, use_fanart, preferred_lang="en"):
-    """
-    Download thumbnail for one title.
-    Returns (PIL Image, source_label) or (None, "missing").
-    """
-    tmdb_id   = item["id"]
-    orig_lang = item.get("original_language")
-
-    preferred_url  = None
-    textless_url   = None
-    last_resort_url = None
-
-    if use_fanart and FANART_KEY:
-        if kind == "tv":
-            ext = {}
-            try:
-                ext = _tmdb_get(f"/tv/{tmdb_id}/external_ids")
-            except Exception:
-                pass
-            tvdb_id = ext.get("tvdb_id")
-            if tvdb_id:
-                url, bucket = _pick_fanart_url(
-                    _fanart_tv(tvdb_id), "tv", preferred_lang, orig_lang)
-                if bucket == "other":
-                    last_resort_url = url
-                elif bucket == "textless":
-                    textless_url = url
-                else:
-                    preferred_url = url
-        else:
-            url, bucket = _pick_fanart_url(
-                _fanart_movie(tmdb_id), "movie", preferred_lang, orig_lang)
-            if bucket == "other":
-                last_resort_url = url
-            elif bucket == "textless":
-                textless_url = url
-            else:
-                preferred_url = url
-
-    # Priority: fanart preferred → TMDB backdrop → fanart textless → fanart last resort
-    if preferred_url:
-        img = _download_url(preferred_url)
-        if img:
-            return img, "fanart"
-
-    if item.get("backdrop_path"):
-        img = _download_url(f"{TMDB_IMG}/{BACKDROP_SZ}{item['backdrop_path']}")
-        if img:
-            return img, "tmdb"
-
-    if textless_url:
-        img = _download_url(textless_url)
-        if img:
-            return img, "fanart_textless"
-
-    if last_resort_url:
-        img = _download_url(last_resort_url)
-        if img:
-            return img, "fanart_other"
-
-    return None, "missing"
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GRID COMPOSITING  (from backdrop.py — unchanged)
@@ -690,43 +570,6 @@ def _ensure_min_tiles(tiles, minimum=12):
             break
         padded.append(tile.copy())
     return padded
-    
-def _apply_dof(image, focus_x, focus_y):
-    """Applies a cinematic DSLR lens blur based on distance from the focal point."""
-    if DOF_BLUR_MAX <= 0:
-        return image
-
-    w, h = image.size
-    fx = focus_x * w
-    fy = focus_y * h
-    diag = math.hypot(w, h)
-
-    xs = np.linspace(0, w - 1, w, dtype=np.float32)
-    ys = np.linspace(0, h - 1, h, dtype=np.float32)
-    xg, yg = np.meshgrid(xs, ys)
-    
-    dist_map = np.sqrt((xg - fx)**2 + (yg - fy)**2) / diag
-    blur_map = np.clip(dist_map ** DOF_FALLOFF, 0.0, 1.0)
-
-    N = 5
-    max_r = DOF_BLUR_MAX
-    layers = [image if (i / N) * max_r < 0.5 else
-              image.filter(ImageFilter.GaussianBlur(radius=(i / N) * max_r))
-              for i in range(N + 1)]
-
-    arrs = [np.array(l, dtype=np.float32) for l in layers]
-    out = np.zeros_like(arrs[0])
-
-    for i in range(N):
-        lo = i / N
-        hi = (i + 1) / N
-        in_ = (blur_map >= lo) & (blur_map < hi)
-        t = ((blur_map - lo) / (hi - lo + 1e-9))[in_]
-        out[in_] = arrs[i][in_] * (1 - t[:, None]) + arrs[i+1][in_] * t[:, None]
-
-    out[blur_map >= (N - 1) / N] = arrs[N][blur_map >= (N - 1) / N]
-
-    return Image.fromarray(out.clip(0, 255).astype(np.uint8), image.mode)
 
 
 def build_grid(tiles, canvas_w, canvas_h, scale=1.0, focus_x=None, focus_y=None):
@@ -788,8 +631,7 @@ def build_grid(tiles, canvas_w, canvas_h, scale=1.0, focus_x=None, focus_y=None)
     rcx = pcx * math.cos(angle_rad) - pcy * math.sin(angle_rad)
     rcy = pcx * math.sin(angle_rad) + pcy * math.cos(angle_rad)
 
-    # FIX: Removed the manual T2 OFFSET_X and OFFSET_Y. 
-    # The trigonometry above already perfectly centers the camera!
+    # Camera is centered purely by the rotation trigonometry above.
     paste_x = int(canvas_w / 2 - (rw / 2 + rcx))
     paste_y = int(canvas_h / 2 - (rh / 2 + rcy))
 
@@ -1066,8 +908,6 @@ def generate_entry(entry, index, total):
     print(f"  🎨 Compositing 1920×1080…")
     canvas = build_grid(tiles, 1920, 1080, scale=1.0, focus_x=fx, focus_y=fy)
 
-    print(f"  📷 Applying Depth of Field blur…")
-    canvas = _apply_dof(canvas, fx, fy)
 
     if not no_gradient:
         canvas = apply_gradient(canvas, accent, shadow_only=shadow_only)
