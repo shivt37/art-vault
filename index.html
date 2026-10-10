@@ -995,7 +995,14 @@ async function init() {
     if (window.location.hash === '#guide') {
       showGuide();
     } else {
-      const firstFolder = viewFolderKeys()[0];
+      const viewKeys = viewFolderKeys();
+      if (viewKeys.length === 0) {
+        document.getElementById('stateMsg').innerHTML =
+          '<div>No folders found in this view — the manifest may still be updating. Try a hard refresh (Ctrl+Shift+R).</div>';
+        document.getElementById('stateMsg').style.display = 'flex';
+        return;
+      }
+      const firstFolder = viewKeys[0];
       if (firstFolder) selectFolder(firstFolder);
     }
 
