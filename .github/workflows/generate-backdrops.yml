@@ -42,7 +42,7 @@ jobs:
       - name: Generate manifest.json
         if: success()
         run: |
-          find . -type f \( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.gif" -o -name "*.webp" -o -name "*.webm" -o -name "*.svg" -o -name "*.avif" -o -name "*.mp4" -o -name "*.json" \) \
+          find . -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.webm" -o -iname "*.svg" -o -iname "*.avif" -o -iname "*.mp4" -o -iname "*.json" \) \
             -not -path "./.git/*" \
             -not -path "./scripts/*" \
             -not -path "./manifest.json" \

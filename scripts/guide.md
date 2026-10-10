@@ -27,7 +27,7 @@ Every **1st of the month**, GitHub Actions runs `generate.py`, which:
 7. Saves directly as **WebP** — no `.jpg` written at any point
 8. Commits everything back to your repo
 
-> **`generate.py` is fully self-contained** — one script, no subprocesses, no external scripts called at runtime. `accent.py` and `backdrop.py` stay in the repo for reference only and are not executed.
+> **`generate.py` is fully self-contained** — one script, no subprocesses, no external scripts called at runtime. (The old `accent.py` / `backdrop.py` references were removed in cleanup; credit to the original sources stays in the table above.)
 
 ---
 
