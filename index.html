@@ -792,13 +792,13 @@
 <script>
 const USER = 'shivt37';
 
-// Views of one repo — img1 shows everything except Badges/, Badges shows only it
+// Views of one repo — Image shows everything except Badges/, Badges shows only it
 const REPOS = [
-  { id: 'img1',   label: 'img1'   },
+  { id: 'Image',   label: 'Image'   },
   { id: 'Badges', label: 'Badges' },
 ];
 
-// Active view — defaults to img1
+// Active view — defaults to Image
 let activeRepo = REPOS[0];
 
 function repoBaseUrl(repo) {
@@ -884,7 +884,7 @@ function isJsonFolder(folderPath) {
   return folderPath === 'Badges/json' || folderPath.startsWith('Badges/json/');
 }
 
-// ── VIEW HELPERS (img1 vs Badges are folder-scoped views of one manifest) ──
+// ── VIEW HELPERS (Image vs Badges are folder-scoped views of one manifest) ──
 function isBadgePath(folder) {
   return folder === 'Badges' || folder.startsWith('Badges/');
 }
@@ -1049,13 +1049,13 @@ function buildSidebar() {
 
     if (count === 0) return;
 
-    // Dot color: json folders get json color, Badges non-json get badge color, img1 uses type color
+    // Dot color: json folders get json color, Badges non-json get badge color, Image uses type color
     let dotColor;
     if (isJsonFolder(folder)) {
       dotColor = TYPE_META.json.color;
     } else if (activeRepo.id === 'Badges') {
       dotColor = isParent ? '#555' : TYPE_META.badge.color;
-    } else if (activeRepo.id === 'img1' && !isParent) {
+    } else if (activeRepo.id === 'Image' && !isParent) {
       dotColor = TYPE_META[detectTypeFromFolder(folder)]?.color || '#555';
     } else {
       dotColor = '#555';
@@ -1261,7 +1261,7 @@ function renderView() {
       const childIsBadges = activeRepo.id === 'Badges' && !childIsJson;
       const childType     = childIsJson ? 'json' : childIsBadges ? 'badge' : detectTypeFromFolder(child);
       const childMeta     = TYPE_META[childType] || TYPE_META['other'];
-      const showTag       = !childIsParent && (activeRepo.id === 'img1' || childIsJson || childIsBadges);
+      const showTag       = !childIsParent && (activeRepo.id === 'Image' || childIsJson || childIsBadges);
       const dotColor      = showTag ? childMeta.color : '#555';
 
       const card = document.createElement('div');
@@ -1306,7 +1306,7 @@ function renderView() {
       badge.style.color       = '#a3e635';
       badge.style.borderColor = 'rgba(163,230,53,0.35)';
       badge.style.background  = 'rgba(163,230,53,0.1)';
-    } else if (activeRepo.id === 'img1') {
+    } else if (activeRepo.id === 'Image') {
       const type = detectTypeFromFolder(activeFolder);
       const meta = TYPE_META[type] || TYPE_META['other'];
       badge.textContent       = meta.label;
@@ -1425,7 +1425,7 @@ function makeImageCard(img) {
         : `<img src="${img.url}" alt="${esc(img.name)}" loading="lazy"
              onerror="this.parentElement.style.background='#1e1e1e';this.style.display='none'">`
       }
-      ${activeRepo.id === 'img1'
+      ${activeRepo.id === 'Image'
         ? `<div class="type-tag" style="color:${tagColor}">
         <div class="type-dot" style="background:${tagColor}"></div>
         ${tagLabel}

@@ -62,7 +62,7 @@ TILE_IMG_SZ  = "w780"
 
 # S12: shared connection pool + bounded parallelism (polite: 8 workers)
 SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "img1-backdrop-generator/1.0"})
+SESSION.headers.update({"User-Agent": "art-vault-backdrop-generator/1.0"})
 MAX_WORKERS = 8
 
 # ─────────────────────────────────────────────────────────────────────────────
