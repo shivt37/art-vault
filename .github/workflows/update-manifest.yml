@@ -14,8 +14,6 @@ on:
       - '**.avif'
       - '**.mp4'
       - '**.json'
-    paths-ignore:
-      - 'manifest.json'
 
 # S2 fix: same queue as the generator so the two can't race
 concurrency:
