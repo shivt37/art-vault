@@ -930,7 +930,7 @@ async function init() {
         // JSON files get type 'json', images use folder-based detection
         const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
         const type = ext === '.json' ? 'json' : detectTypeFromFolder(folder);
-        return { path: f, url: BASE_URL + f, name, folder, type };
+        return { path: f, url: BASE_URL + f.split('/').map(encodeURIComponent).join('/'), name, folder, type };
       });
 
     folderMap = {};
@@ -1294,6 +1294,31 @@ function renderView() {
   }
 }
 
+// ── CLIPBOARD (F7 fix: guard + fallback for http/file) ─────────────────────
+async function copyText(text, btn) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      if (!ok) throw new Error('execCommand failed');
+    }
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+  } catch {
+    btn.textContent = 'Failed';
+  } finally {
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  }
+}
+
 // ── JSON CARD ─────────────────────────────────────────────────────────────
 function makeJsonCard(item) {
   const card = document.createElement('div');
@@ -1320,21 +1345,13 @@ function makeJsonCard(item) {
   // View — open raw JSON in new tab
   card.querySelector('.json-view-btn').addEventListener('click', (e) => {
     e.stopPropagation();
-    window.open(e.currentTarget.dataset.url, '_blank');
+    window.open(e.currentTarget.dataset.url, '_blank', 'noopener');
   });
 
   // Copy URL
   card.querySelector('.copy-btn').addEventListener('click', (e) => {
     e.stopPropagation();
-    const btn = e.currentTarget;
-    navigator.clipboard.writeText(btn.dataset.url).then(() => {
-      btn.textContent = 'Copied';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
-    }).catch(() => {
-      btn.textContent = 'Failed';
-      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-    });
+    copyText(e.currentTarget.dataset.url, e.currentTarget);
   });
 
   return card;
@@ -1383,20 +1400,12 @@ function makeImageCard(img) {
 
   card.addEventListener('click', (e) => {
     if (e.target.closest('.card-footer')) return;
-    window.open(img.url, '_blank');
+    window.open(img.url, '_blank', 'noopener');
   });
 
   card.querySelector('.copy-btn').addEventListener('click', (e) => {
     e.stopPropagation();
-    const btn = e.currentTarget;
-    navigator.clipboard.writeText(btn.dataset.url).then(() => {
-      btn.textContent = 'Copied';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
-    }).catch(() => {
-      btn.textContent = 'Failed';
-      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-    });
+    copyText(e.currentTarget.dataset.url, e.currentTarget);
   });
 
   return card;
