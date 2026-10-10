@@ -1,4 +1,4 @@
-# Pinned runtime deps for generate.py (workflow runs Python 3.12 — pins must support it)
+# Pinned runtime deps for generate.py (workflow runs Python 3.14 — pins must support it)
 requests==2.34.2
 Pillow==12.3.0
 numpy==2.5.3
