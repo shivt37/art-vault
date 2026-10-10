@@ -889,6 +889,11 @@ function isParentFolder(folder, allFolderKeys) {
   return allFolderKeys.some(f => f !== folder && f.startsWith(folder + '/'));
 }
 
+// Escape untrusted strings before injecting into innerHTML / attributes.
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 const TYPE_META = {
   poster:     { label: 'Poster',     color: '#e5a00d' },
   cover:      { label: 'Cover',      color: '#F9FF00' },
@@ -926,7 +931,7 @@ async function init() {
         const ext = f.slice(f.lastIndexOf('.')).toLowerCase();
         // For Badges repo: allow .json only inside the json/ folder
         if (ext === '.json') {
-          return activeRepo.id === 'Badges' && (f === 'json' || f.startsWith('json/'));
+          return activeRepo.id === 'Badges' && f.startsWith('json/');
         }
         return IMG_EXT.includes(ext);
       })
@@ -1030,7 +1035,7 @@ function buildSidebar() {
     el.style.setProperty('--depth', depth);
     el.innerHTML = `
       <div class="type-dot" style="background:${dotColor}"></div>
-      <span class="folder-name">${displayName}</span>
+      <span class="folder-name">${esc(displayName)}</span>
       <span class="folder-count">${count}</span>
     `;
     el.addEventListener('click', () => selectFolder(folder));
@@ -1050,7 +1055,7 @@ function selectFolder(folder) {
   document.getElementById('guide-panel').style.display = 'none';
 
   document.querySelectorAll('.folder-item').forEach(i => i.classList.remove('active'));
-  const el = document.querySelector(`.folder-item[data-key="${folder}"]`);
+  const el = document.querySelector(`.folder-item[data-key="${CSS.escape(folder)}"]`);
   if (el) el.classList.add('active');
 
   // clear hash if guide was open
@@ -1143,7 +1148,7 @@ function renderView() {
       const folder = normalise(i.folder);
       return name.includes(q) || folder.includes(q);
     });
-    breadcrumb.innerHTML = `Search <span>for "${searchQuery}"</span>`;
+    breadcrumb.innerHTML = `Search <span>for &quot;${esc(searchQuery)}&quot;</span>`;
     badge.style.display = 'none';
     pill.textContent = `${results.length} result${results.length !== 1 ? 's' : ''}`;
 
@@ -1180,7 +1185,7 @@ function renderView() {
     img.folder === activeFolder || img.folder.startsWith(activeFolder + '/')
   ).length;
 
-  breadcrumb.innerHTML = folderName;
+  breadcrumb.textContent = folderName;
   pill.textContent = `${totalCount} file${totalCount !== 1 ? 's' : ''}`;
 
   // ── PARENT FOLDER ──
@@ -1232,7 +1237,7 @@ function renderView() {
       card.innerHTML = `
         <div class="subfolder-card-top">
           <div class="subfolder-dot" style="background:${dotColor}"></div>
-          <div class="subfolder-name">${childName}</div>
+          <div class="subfolder-name">${esc(childName)}</div>
         </div>
         <div class="subfolder-meta">
           ${showTag
@@ -1339,13 +1344,13 @@ function makeJsonCard(item) {
       <div class="json-card-top">
         <div class="json-icon">{ }</div>
         <div class="json-card-info">
-          <div class="json-card-name" title="${item.name}">${displayName}</div>
+          <div class="json-card-name" title="${esc(item.name)}">${esc(displayName)}</div>
           <span class="json-card-tag">JSON</span>
         </div>
       </div>
     </div>
     <div class="json-card-footer">
-      <div class="card-name" title="${item.name}">${item.name}</div>
+      <div class="card-name" title="${esc(item.name)}">${esc(item.name)}</div>
       <button class="json-view-btn" data-url="${item.url}">View</button>
       <button class="copy-btn" data-url="${item.url}">Copy</button>
     </div>
@@ -1385,7 +1390,7 @@ function makeImageCard(img) {
         ? `<div style="width:100%;min-height:120px;background:#0d0d0d;display:flex;align-items:center;justify-content:center;cursor:pointer;">
              <svg width="40" height="40" viewBox="0 0 24 24" fill="rgba(255,255,255,0.5)"><path d="M8 5v14l11-7z"/></svg>
            </div>`
-        : `<img src="${img.url}" alt="${img.name}" loading="lazy"
+        : `<img src="${img.url}" alt="${esc(img.name)}" loading="lazy"
              onerror="this.parentElement.style.background='#1e1e1e';this.style.display='none'">`
       }
       ${activeRepo.id === 'img1'
@@ -1402,7 +1407,7 @@ function makeImageCard(img) {
       }
     </div>
     <div class="card-footer">
-      <div class="card-name" title="${img.name}">${img.name.replace(/\.[^.]+$/, '')}</div>
+      <div class="card-name" title="${esc(img.name)}">${esc(img.name.replace(/\.[^.]+$/, ''))}</div>
       <button class="copy-btn" data-url="${img.url}">Copy</button>
     </div>
   `;
@@ -1429,7 +1434,7 @@ function clearSearch() {
   searchQuery = '';
   searchClear.style.display = 'none';
   document.querySelectorAll('.folder-item').forEach(i => i.classList.remove('active'));
-  document.querySelector(`.folder-item[data-key="${activeFolder}"]`)?.classList.add('active');
+  document.querySelector(`.folder-item[data-key="${CSS.escape(activeFolder)}"]`)?.classList.add('active');
   renderView();
 }
 
@@ -1438,7 +1443,7 @@ searchInput.addEventListener('input', e => {
   searchClear.style.display = searchQuery ? 'flex' : 'none';
   if (!searchQuery) {
     document.querySelectorAll('.folder-item').forEach(i => i.classList.remove('active'));
-    document.querySelector(`.folder-item[data-key="${activeFolder}"]`)?.classList.add('active');
+    document.querySelector(`.folder-item[data-key="${CSS.escape(activeFolder)}"]`)?.classList.add('active');
   } else {
     document.querySelectorAll('.folder-item').forEach(i => i.classList.remove('active'));
   }
