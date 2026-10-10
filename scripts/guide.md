@@ -91,7 +91,7 @@ You never need to set a colour manually. The script resolves it automatically fo
 | `output` | string | **required** | Output path for the saved `.webp` file |
 | `sources` | array | optional | TMDB source strings (see [Sources](#sources--complete-format-reference)) |
 | `mdblist_url` | string or array | optional | `"username/list-slug"`, full mdblist.com URL, or an array of either for multiple lists |
-| `sort` | string | `"score.desc"` | MDBList sort order (see [MDBList Sort](#mdblist-sort-options)) |
+| `sort` | string | `""` (native list order) | MDBList sort order (see [MDBList Sort](#mdblist-sort-options)) |
 | `logo` | string | optional | Path to logo image for auto accent extraction |
 | `accent_color` | string | optional | Manual override — `"R,G,B"` or `"#RRGGBB"` |
 | `no_accent` | bool | `false` | Skip all shadows and gradient overlay entirely — pure tile grid |
@@ -700,16 +700,28 @@ Start with `movie:/` or `tv:/` followed by any TMDB endpoint path.
 
 ## MDBList Sort Options
 
+> Leave `sort` as `""` (or omit it) to keep the curator's **native list order** — no `sort`/`order` is sent to the API. Set one of the values below to re-rank instead.
+
 | Value | Description |
 |---|---|
-| `score.desc` | MDBList combined score — default when `sort` is not set |
+| `score.desc` | MDBList combined score |
 | `score.asc` | Lowest score first |
+| `rank.desc` | MDBList rank |
+| `rank.asc` | Lowest rank first |
+| `score_average.desc` | Highest average score first |
+| `score_average.asc` | Lowest average score first |
 | `imdbrating.desc` | Highest IMDb rating first |
 | `imdbrating.asc` | Lowest IMDb rating first |
 | `imdbvotes.desc` | Most IMDb votes first |
+| `imdbvotes.asc` | Fewest IMDb votes first |
+| `imdbpopular.desc` | Highest IMDb popularity first |
+| `imdbpopular.asc` | Lowest IMDb popularity first |
 | `tmdbpopular.desc` | TMDB popularity metric |
+| `tmdbpopular.asc` | Lowest TMDB popularity first |
 | `released.desc` | Most recently released first |
 | `released.asc` | Oldest releases first |
+| `releasedigital.desc` | Most recent digital release first |
+| `releasedigital.asc` | Oldest digital release first |
 
 ---
 
@@ -752,6 +764,8 @@ Only set this if auto-detection gives the wrong colour for a specific entry. Lea
 
 ## Provider IDs
 
+> Regions are deliberate: Netflix + Prime Video use `IN` (Indian catalogs), everything else uses `US`. Keep it that way unless your audience changes.
+
 ### India (`watch_region=IN`)
 
 | Service | ID |
@@ -771,12 +785,15 @@ Only set this if auto-detection gives the wrong colour for a specific entry. Lea
 | Prime Video | `9` |
 | Disney+ | `337` |
 | Apple TV+ | `350` |
-| HBO Max | `384` |
+| Max (current name; was "HBO Max" `384`) | `1899` |
 | Hulu | `15` |
-| Paramount+ | `531` |
-| Peacock | `386` |
-| Crunchyroll | `283` |
-| Discovery+ | `584` |
+| Paramount+ (standalone) | `531` |
+| Paramount+ channel bundles (config: movies `2303\|2616\|582\|633`, TV adds `1853`; standalone would be `531` alone) | `2303\|2616\|582\|633` |
+| Peacock (incl. Premium `387`) | `386\|387` |
+| Crunchyroll (incl. Amazon channel `1968`) | `283\|1968` |
+| Discovery+ (incl. Amazon channel `520`) | `520\|584` |
+
+> The config uses the **wide-net** rows above (standalone + channel bundles) for Paramount+, Peacock, Crunchyroll and Discovery+ — more titles, but bundle-channel catalogs bleed in. Prefer the standalone ID alone for a pure service look.
 
 ---
 
