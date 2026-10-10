@@ -14,6 +14,8 @@ on:
       - '**.avif'
       - '**.mp4'
       - '**.json'
+  # Manual runs from the Actions tab
+  workflow_dispatch:
 
 # S2 fix: same queue as the generator so the two can't race
 concurrency:
