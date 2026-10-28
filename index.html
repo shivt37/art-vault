@@ -928,6 +928,7 @@ const TYPE_META = {
   video:      { label: 'Video',      color: '#fb923c' },
   json:       { label: 'JSON',       color: '#38bdf8' },
   badge:      { label: 'Badge',      color: '#a3e635' },
+  svg:        { label: 'SVG',        color: '#f472b6' },
   other:      { label: 'Other',      color: '#f87171' },
   anime:      { label: 'Anime',      color: '#ff6eb4' },
 };
@@ -1413,8 +1414,14 @@ function makeImageCard(img) {
   const isWebm = ext === 'webm';
   const isVideo = isMp4 || isWebm;
 
+  const isSvg = ext === 'svg';
+
   const tagLabel = isMp4 ? 'Video MP4' : isWebm ? 'Video WebM' : meta.label;
   const tagColor = isMp4 ? '#fb923c' : isWebm ? '#38bdf8' : meta.color;
+
+  // Badges view: .svg files get an SVG tag, everything else stays Badge
+  const badgeTagLabel = isSvg ? TYPE_META.svg.label : TYPE_META.badge.label;
+  const badgeTagColor = isSvg ? TYPE_META.svg.color : TYPE_META.badge.color;
 
   card.innerHTML = `
     <div class="img-wrap">
@@ -1431,9 +1438,9 @@ function makeImageCard(img) {
         ${tagLabel}
       </div>`
         : activeRepo.id === 'Badges'
-          ? `<div class="type-tag" style="color:#a3e635">
-        <div class="type-dot" style="background:#a3e635"></div>
-        Badge
+          ? `<div class="type-tag" style="color:${badgeTagColor}">
+        <div class="type-dot" style="background:${badgeTagColor}"></div>
+        ${badgeTagLabel}
       </div>`
           : ''
       }
